@@ -88,6 +88,7 @@
       if (this.isRoot() && this.model) {
         this.model.on('ready', function () {
           done();
+          _this.setReadyBottomUp();
         });
         this.model.setHooks();
         this.model.load();
@@ -101,9 +102,9 @@
 
       function done() {
         utils.removeClass(_this.placeholder, class_loading);
-        _this.setReady();
       }
     },
+
     setReady: function () {
       if (!this._readyOnce) {
         this.trigger('readyOnce');
@@ -111,6 +112,13 @@
       }
       this._ready = true;
       this.trigger('ready');
+    },
+
+    setReadyBottomUp: function() {
+      utils.forEach(this.components, function(c) {
+        c.setReadyBottomUp();
+      });
+      this.setReady();
     },
 
     /**

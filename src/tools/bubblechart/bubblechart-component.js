@@ -194,7 +194,9 @@
 
       this.dragger = d3.behavior.drag()
         .on("dragstart", function (d, i) {
-          d3.event.sourceEvent.stopPropagation();
+        	d3.event.sourceEvent.stopPropagation();
+        	var KEY = _this.KEY;
+        	_this.druging = d[KEY];
         })
         .on("drag", function (d, i) {
           var KEY = _this.KEY;
@@ -213,7 +215,8 @@
           _this._repositionLabels(d, i, this, resolvedX, resolvedY, resolvedX0, resolvedY0, 0);
         })
         .on("dragend", function (d, i) {
-          var KEY = _this.KEY;
+        	var KEY = _this.KEY;
+        _this.druging = null;
           _this.model.entities.setLabelOffset(d, [
             Math.round(_this.cached[d[KEY]].labelX_ * 100) / 100,
             Math.round(_this.cached[d[KEY]].labelY_ * 100) / 100
@@ -446,11 +449,16 @@
       var titleStringX = this.translator("indicator/" + this.model.marker.axis_x.which);
       var titleStringS = this.translator("indicator/" + this.model.marker.size.which);
       var titleStringC = this.translator("indicator/" + this.model.marker.color.which);
+      
+      var unitStringY = this.translator("unit/" + this.model.marker.axis_y.unit);
+      var unitStringX = this.translator("unit/" + this.model.marker.axis_x.unit);
+      var unitStringS = this.translator("unit/" + this.model.marker.size.unit);
+      var unitStringC = this.translator("unit/" + this.model.marker.color.unit);
 
-      if (!!this.model.marker.axis_y.unit) titleStringY = titleStringY + ", " + this.model.marker.axis_y.unit;
-      if (!!this.model.marker.axis_x.unit) titleStringX = titleStringX + ", " + this.model.marker.axis_x.unit;
-      if (!!this.model.marker.size.unit) titleStringS = titleStringS + ", " + this.model.marker.size.unit;
-      if (!!this.model.marker.color.unit) titleStringC = titleStringC + ", " + this.model.marker.color.unit;
+      if (!!unitStringY) titleStringY = titleStringY + ", " +  unitStringY;
+      if (!!unitStringX) titleStringX = titleStringX + ", " +  unitStringX;
+      if (!!unitStringS) titleStringS = titleStringS + ", " +  unitStringS;
+      if (!!unitStringC) titleStringC = titleStringC + ", " +  unitStringC; 
 
       var yTitle = this.yTitleEl.selectAll("text").data([0]);
       yTitle.enter().append("text");
@@ -925,6 +933,9 @@
     _updateLabel: function (d, index, valueX, valueY, scaledS, valueL, duration) {
       var _this = this;
       var KEY = this.KEY;
+      if (d[KEY] == _this.druging)
+      	return;
+
       if (duration == null) duration = _this.duration;
 
       // only for selected entities

@@ -59,9 +59,23 @@
                     _this.updateTime();
                     if(_this.model.time.yMaxMethod==="immediate")_this._adjustMaxY();
                     _this.redrawDataPoints();
+                    _this.redrawSelectList();
                 },
                 'change:time:xLogStops': function () {
-                    _this.resize();
+                    _this.updateSize();
+                },
+                "change:entities:brush": function () {
+                  if (!_this._readyOnce) return;
+                  //console.log("EVENT change:entities:brush");
+                  _this.highlightDataPoints();
+                    _this.updateBubbleOpacity();
+                },
+                'change:entities:select': function () {
+                  if (!_this._readyOnce) return;
+                  //console.log("EVENT change:entities:select");
+                  _this.selectDataPoints();
+                    _this.redrawSelectList();
+                    _this.updateBubbleOpacity();
                 },
                 'change:time:yMaxMethod': function () {
                     var method = _this.model.time.yMaxMethod;
@@ -75,11 +89,21 @@
                     //console.log("change marker stack");
                     _this.updateIndicators();
                     _this.updateEntities();
-                    _this.resize();
+                    _this.updateSize();
                     _this.updateTime();
                     _this._adjustMaxY();
                     _this.redrawDataPoints();
+                    _this.highlightDataPoints();
+                    _this.selectDataPoints();
+                    _this.redrawSelectList();
+                    _this.updateBubbleOpacity();
                     
+                },
+                'change:entities:opacitySelectDim': function () {
+                  _this.updateBubbleOpacity();
+                },
+                'change:entities:opacityRegular': function () {
+                  _this.updateBubbleOpacity();
                 }
             }
 
@@ -124,6 +148,7 @@
             this.xTitleEl = this.graph.select('.vzb-mc-axis-x-title');
             this.yearEl = this.graph.select('.vzb-mc-year');
             this.mountainContainer = this.graph.select('.vzb-mc-mountains');
+            this.mountainLabelContainer = this.graph.select('.vzb-mc-mountains-labels');
             this.mountains = null;
             this.tooltip = this.element.select('.vzb-tooltip');
 
@@ -132,8 +157,9 @@
             var _this = this;
             this.on("resize", function () {
                 //console.log("acting on resize");
-                _this.resize();
+                _this.updateSize();
                 _this.redrawDataPoints();
+                _this.redrawSelectList();
             });
 
             this.KEY = this.model.entities.getDimension();
@@ -141,10 +167,14 @@
 
             this.updateIndicators();
             this.updateEntities();
-            this.resize();
+            this.updateSize();
             this.updateTime();
             this._adjustMaxY();
             this.redrawDataPoints();
+            this.highlightDataPoints();
+            this.selectDataPoints();
+            this.redrawSelectList();
+            this.updateBubbleOpacity();
         },
 
 
@@ -159,16 +189,15 @@
 
             var xTitle = this.xTitleEl.selectAll("text").data([0]);
             xTitle.enter().append("text");
-            xTitle.text(this.translator(this.model.marker.axis_x.unit));
+            xTitle.text(this.translator("unit/" + this.model.marker.axis_x.unit));
 
             //scales
             this.yScale = this.model.marker.axis_y.getScale();
             this.xScale = this.model.marker.axis_x.getScale();
             this.cScale = this.model.marker.color.getScale();
+            
+            this.xAxis.tickFormat(_this.model.marker.axis_x.tickFormatter);
 
-            this.xAxis.tickFormat(function (d) {
-                return _this.model.marker.axis_x.getTick(d);
-            });
 
             //TODO i dunno how to remove this magic constant
             // we have to know in advance where to calculate distributions
@@ -185,6 +214,7 @@
             var _this = this;
 
             // construct pointers
+            var stackMode = this.model.marker.stack.which;
             var endTime = this.model.time.end;
             this.model.entities._visible = this.model.marker.getKeys()
                 .map(function (d) {
@@ -196,42 +226,41 @@
                     return pointer;
                 })
             
-            // update the stacked pointers
-            if (_this.model.marker.stack.use === "property") {
-                this.stackedPointers = d3.nest()
-                    .key(function (d) {
-                        
-                        return _this.model.marker.stack.getValue(d) 
+            
+            //TODO: optimise this!
+            this.groupedPointers = d3.nest()
+                .key(function (d) {
+                    return _this.model.marker.stack.use === "property"?
+                        _this.model.marker.stack.getValue(d)
+                        : 
+                        _this.model.marker.group.getValue(d)
                     })
-                    .sortValues(function(a,b) { return b.sortValue[0] - a.sortValue[0] } )
-                    .entries(this.model.entities._visible);
-            }else if(_this.model.marker.stack.which === "all"){
-                this.stackedPointers = [{values: this.model.entities._visible}];
-            }else{
+                .entries(this.model.entities._visible)
+                .forEach(function (group) {
+                    var groupSortValue = d3.sum(group.values.map(function (m) {
+                        return m.sortValue[0];
+                    }));
+                    group.values.forEach(function (d) {
+                        d.sortValue[1] = groupSortValue;
+                    })
+                })
+            
+            // update the stacked pointers
+            if (_this.model.marker.stack.which === "none"){
                 this.stackedPointers = [];
-            }
-            
-            
-            // sort pointers
-            this.stackedPointers.forEach(function(group){
-                var groupSortValue = d3.sum(group.values.map(function(m){
-                    return m.sortValue[0]
-                }));
-                group.values.forEach(function(d){
-                    d.sortValue[1] = groupSortValue;
-                })
-            })
-            
-            this.model.entities._visible
-                .sort(function (a, b) {
-                    return b.sortValue[0] - a.sortValue[0];
-                })
-                .sort(function (a, b) {
-                    return b.sortValue[1] - a.sortValue[1];
-                })
+                this.model.entities._visible.sort(function (a, b) {return b.sortValue[0] - a.sortValue[0];})
 
-            //console.log(this.model.entities._visible.map(function(m){return m.geo}))
-            
+            }else{
+                this.stackedPointers = d3.nest()
+                    .key(function (d) { return _this.model.marker.stack.getValue(d) })
+                    .key(function (d) { return _this.model.marker.group.getValue(d) })
+                    .sortValues(function (a, b) {return b.sortValue[0] - a.sortValue[0]})
+                    .entries(this.model.entities._visible);
+                
+                this.model.entities._visible.sort(function (a, b) {return b.sortValue[1] - a.sortValue[1];})
+            }
+                      
+            //console.log(JSON.stringify(this.model.entities._visible.map(function(m){return m.geo})))
             
             //bind the data to DOM elements
             this.mountains = this.mountainContainer.selectAll('.vzb-mc-mountain')
@@ -244,6 +273,10 @@
             this.mountains.enter().append("path")
                 .attr("class", "vzb-mc-mountain")
                 .on("mousemove", function (d, i) {
+                
+                    _this.model.entities.highlightEntity(d);
+                
+                
                     var mouse = d3.mouse(_this.graph.node()).map(function (d) {
                         return parseInt(d);
                     });
@@ -256,13 +289,148 @@
                 })
                 .on("mouseout", function (d, i) {
                     _this.tooltip.classed("vzb-hidden", true);
+                    _this.model.entities.clearHighlighted();
                 })
                 .on("click", function (d, i) {
                     _this.model.entities.selectEntity(d);
                 });
-
+            
+        },
+        
+        /*
+         * Highlights all hovered shapes
+         */
+        highlightDataPoints: function () {
+            var _this = this;
+            this.someHighlighted = (this.model.entities.brush.length > 0);
+            
+            if (this.model.entities.brush.length==1) {
+                var key = this.model.entities.brush[0][_this.KEY];
+                var variance = _this._math.giniToVariance(_this.values.size[key]);
+                var mean = _this._math.gdpToMean(_this.values.axis_x[key], variance);
+                this.xAxisEl.call(this.xAxis.highlightValue(Math.exp(Math.log(mean) - variance)));
+            }else{
+                this.xAxisEl.call(this.xAxis.highlightValue("none"));
+            }
+            
+            if(!this.mountainLabels || !this.someSelected) return;
+            this.mountainLabels.classed("vzb-highlight", function(d){return _this.model.entities.isHighlighted(d)});
         },
 
+
+
+        selectDataPoints: function () {
+            var _this = this;
+            this.someSelected = (this.model.entities.select.length > 0);
+            
+            var listData = this.model.entities._visible.filter(function(f){
+                    return _this.model.entities.isSelected(f);
+                })
+                .sort(function (a, b) {
+                    if(b.max&&a.max) return b.max - a.max;
+                    return b.sortValue[0] - a.sortValue[0];
+                });
+            
+            this.mountainLabels = this.mountainLabelContainer.selectAll("g").data(listData)
+            this.mountainLabels.exit().remove();
+            this.mountainLabels.enter().append("g")
+                .attr("class", "vzb-mc-label")
+                .each(function(d, i){
+                    d3.select(this).append("circle");
+                    d3.select(this).append("text").attr("class", "vzb-mc-label-shadow");
+                    d3.select(this).append("text");
+                })
+                .on("mousemove", function (d, i) {
+                    _this.model.entities.highlightEntity(d);
+                })
+                .on("mouseout", function (d, i) {
+                    _this.model.entities.clearHighlighted();
+                })
+                .on("click", function (d, i) {
+                    _this.model.entities.clearHighlighted();
+                    _this.model.entities.selectEntity(d);
+                });
+                
+        },
+        
+        
+        redrawSelectList: function(){
+            var _this = this;
+            if(!this.mountainLabels || !this.someSelected) return;
+            
+            var sample = this.mountainLabelContainer.append("g").attr("class", "vzb-mc-label").append("text").text("0");
+            var fontHeight = sample[0][0].getBBox().height;
+            d3.select(sample[0][0].parentNode).remove();
+            
+            this.mountainLabels
+                .attr("transform", function(d,i){return "translate(0," + (fontHeight*i) + ")"})
+                .each(function(d, i){
+                    var string = _this.values.label[d.KEY()] 
+                        + ": " + 
+                        _this.model.marker.axis_y.tickFormatter(_this.values.axis_y[d.KEY()])
+                        + (i==0?" people":"");
+                
+                    d3.select(this).select("circle")
+                        .attr("r", fontHeight/2.5)
+                        .attr("cx", fontHeight/2)
+                        .attr("cy", fontHeight/1.5)
+                        .style("fill", _this.cScale(_this.values.color[d.KEY()]))
+                    
+                    
+                    d3.select(this).selectAll("text")
+                        .attr("x", fontHeight)
+                        .attr("y", fontHeight)
+                        .text(string)
+            }) 
+        },
+
+        updateBubbleOpacity: function () {
+          var _this = this;
+          //if(!duration)duration = 0;
+
+          var OPACITY_HIGHLT = 1.0;
+          var OPACITY_HIGHLT_DIM = 0.3;
+          var OPACITY_SELECT = 0.8;
+          var OPACITY_REGULAR = this.model.entities.opacityRegular;
+          var OPACITY_SELECT_DIM = this.model.entities.opacitySelectDim;
+
+          this.mountains
+            //.transition().duration(duration)
+            .style("opacity", function (d) {
+
+              if (_this.someHighlighted) {
+                //highlight or non-highlight
+                if (_this.model.entities.isHighlighted(d)) return OPACITY_HIGHLT;
+              }
+
+              if (_this.someSelected) {
+                //selected or non-selected
+                return _this.model.entities.isSelected(d) ? OPACITY_SELECT : OPACITY_SELECT_DIM;
+              }
+
+              if (_this.someHighlighted) return OPACITY_HIGHLT_DIM;
+
+              return OPACITY_REGULAR;
+            });
+
+
+          var someSelectedAndOpacityZero = _this.someSelected && _this.model.entities.opacitySelectDim < 0.01;
+
+          // when pointer events need update...
+          if (someSelectedAndOpacityZero != this.someSelectedAndOpacityZero_1) {
+            this.mountains.style("pointer-events", function (d) {
+              return (!someSelectedAndOpacityZero || _this.model.entities.isSelected(d)) ?
+                "visible" : "none";
+            });
+          }
+
+          this.someSelectedAndOpacityZero_1 = _this.someSelected && _this.model.entities.opacitySelectDim < 0.01;
+        },
+
+        
+        
+        
+        
 
         /*
          * UPDATE TIME:
@@ -289,7 +457,11 @@
             
             //recalculate stacking
             this.stackedPointers.forEach(function (group) {
-                _this.stack( group.values.filter(function(f){return !f.hidden}) );
+                var toStack = [];
+                group.values.forEach(function(subgroup){
+                    toStack = toStack.concat(subgroup.values.filter(function(f){return !f.hidden}))
+                })
+                _this.stack(toStack);
             })
 
         },
@@ -311,7 +483,7 @@
          * Executes everytime the container or vizabi is resized
          * Ideally,it contains only operations related to size
          */
-        resize: function () {
+        updateSize: function () {
 
             var margin;
             var tick_spacing;
@@ -355,7 +527,7 @@
             var scaleType = this.model.marker.axis_x.scaleType;
             var rangeFrom = scaleType == "linear" ? this.xScale.domain()[0] : Math.log(this.xScale.domain()[0]);
             var rangeTo = scaleType == "linear" ? this.xScale.domain()[1] : Math.log(this.xScale.domain()[1]);
-            var rangeStep = (rangeTo - rangeFrom) / (width ? width / 3 : 196);
+            var rangeStep = (rangeTo - rangeFrom) / Math.max(100,(width ? width / 5 : 100));
             this.mesh = d3.range(rangeFrom, rangeTo, rangeStep);
             if (scaleType != "linear") this.mesh =
                 this.mesh.map(function (dX) {return Math.exp(dX)}).filter(function (dX) {return dX > 0});
@@ -369,7 +541,7 @@
                     scaleType: scaleType,
                     toolMargin: margin,
                     method: this.xAxis.METHOD_REPEATING,
-                    stops: this.model.time.xLogStops 
+                    stops: this.model.time.xLogStops
                 });
 
 
@@ -415,14 +587,15 @@
                 // but as the mountains are not aligned this sum will be larger than the actual total height
                 this.model.entities._visible.forEach(function(d){
                     var points = _this.cached[d.KEY()];
+                    d.max = d3.max(points.map(function(m){return m.y + m.y0}));
                     var max = d3.max(points.map(function(m){return m.y}));
                     if(max > 0) yMax += max;
                 })
             }else{
                 this.model.entities._visible.forEach(function(d){
                     var points = _this.cached[d.KEY()];
-                    var max = d3.max(points.map(function(m){return m.y + m.y0}));
-                    if(max > yMax) yMax = max;
+                    d.max = d3.max(points.map(function(m){return m.y + m.y0}));
+                    if(d.max > yMax) yMax = d.max;
                 })
             }
             this.yScale.domain([0, yMax]);

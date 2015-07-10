@@ -19,13 +19,10 @@
         overflow: hidden;
         font-family: $vzb-font-family;
         .vzb-mc-mountain {
-            @include opacity(0.5);
             stroke: white;
+            stroke-opacity: 0.5;
             stroke-width: 1px;
             cursor: pointer;
-            &:hover {
-                @include opacity(1);
-            }
         }
         .vzb-mc-title {
             color: $vzb-color-primary;
@@ -44,6 +41,19 @@
         }
         .vzb-mc-axis-x-title text{
             @include font-size(40px);
+        }
+        .vzb-mc-mountains-labels text, .vzb-mc-mountains-labels circle{
+            cursor: pointer;
+            fill: $vzb-mc-color-axis;
+            @include font-size(40px);
+        }
+        .vzb-mc-mountains-labels text.vzb-mc-label-shadow {
+            stroke: white;
+            stroke-width: 5;
+            stroke-opacity: 0.6;
+        }
+        .vzb-mc-mountains-labels .vzb-highlight text.vzb-mc-label-shadow {
+            stroke: yellow;
         }
         .vzb-mc-axis-x,
         .vzb-mc-axis-y {
@@ -73,14 +83,14 @@
 }
     &.vzb-medium {
         .vzb-mountainchart {
-            .vzb-mc-axis text, .vzb-mc-axis-x-title text {
+            .vzb-mc-axis text, .vzb-mc-axis-x-title text, .vzb-mc-mountains-labels text{
                 @include font-size(30px);
             }
         }
     }
     &.vzb-small {
         .vzb-mountainchart {
-            .vzb-mc-axis text, .vzb-mc-axis-x-title text {
+            .vzb-mc-axis text, .vzb-mc-axis-x-title text, .vzb-mc-mountains-labels text{
                 @include font-size(20px);
             }
         }

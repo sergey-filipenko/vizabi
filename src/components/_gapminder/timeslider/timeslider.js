@@ -76,6 +76,8 @@
       //binds methods to this model
       this.model_binds = {
         'change:time': function (evt, original) {
+          if(!_this._readyOnce) return;
+
           if ((['change:time:start', 'change:time:end']).indexOf(evt) !== -1) {
             _this.changeLimits();
           }
@@ -164,8 +166,6 @@
         _this.xScale.range([0, arg.rangeMax]);
         _this.resize();
       });
-
-      var _this = this;
 
     },
 
