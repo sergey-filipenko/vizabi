@@ -253,11 +253,11 @@
      * http://stackoverflow.com/questions/1960473/unique-values-in-an-array
      */
     unique: function (arr, func) {
-      var u = {};
-      var a = [];
+      var u = {}, a = [], isDate = this.isDate;
       if (!func) {
         func = function (d) {
-          return d;
+          //TODO: remove full year hack
+          return isDate(d) ? d.getFullYear() : d;
         };
       }
       for (var i = 0, l = arr.length; i < l; i += 1) {

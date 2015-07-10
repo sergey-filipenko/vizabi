@@ -122,6 +122,19 @@
     },
 
     /**
+     * clear data
+     */
+    resetData: function (queryId, values) {
+      if (!queryId) return;
+      var col = this._collection[queryId];
+      col.data = values;
+      col.filtered = {};
+      col.nested = {};
+      col.unique = {};
+      col.limits = {};
+    },
+
+    /**
      * checks whether this combination is cached or not
      */
     isCached: function (query, language, reader) {

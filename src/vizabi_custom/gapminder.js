@@ -269,9 +269,9 @@
       }
     },
     data: {
-      //reader: "waffle-server",
-      reader: "csv-file",
-      path: "local_data/waffles/{{LANGUAGE}}/basic-indicators.csv"
+      reader: "waffle-server"
+      // reader: "csv-file",
+      // path: "local_data/waffles/{{LANGUAGE}}/basic-indicators.csv"
     },
 
     ui: {

@@ -171,7 +171,8 @@
 
     /**
      * Gets all submodels of the current model
-     * @param object [object=false] Should it return an object?
+     * @param {Boolean} object [object=false] Should it return an object?
+     * @param {Function} fn filter function
      * @returns {Array} submodels
      */
     getSubmodels: function (object, fn) {
@@ -287,7 +288,6 @@
      */
     setLoadingDone: function (p_id) {
       this._loading = utils.without(this._loading, p_id);
-      this.setReady();
     },
 
     /**
@@ -389,8 +389,9 @@
         //end this load call
         _this._loadedOnce = true;
         _this._loadCall = false;
-        _this.setReady();
         promiseLoad.resolve();
+        //after promise, we set it ready
+        _this.setReady();
       });
       return promiseLoad;
     },
@@ -567,6 +568,22 @@
     },
 
     /**
+     * Fill gaps in dataset
+     */
+    fillGaps: function() {
+        //TODO: only works for time and yearly data
+        var lim = this.getLimits();
+        var dim = this._getFirstDimension(); //how to group the data
+        var dimTime = this._getFirstDimension({type: 'time'});
+        //array with all years between min and max
+        var years = d3.range(lim.min.getFullYear(), lim.max.getFullYear() + 1, 1);
+        //fill in each hook
+        utils.forEach(this._dataCube, function(hook, name) {
+          fillHookGaps(hook, [dim], years, dimTime);
+        });
+    },
+
+    /**
      * gets multiple values from the hook
      * @param {Object} filter Reference to the row. e.g: {geo: "swe", time: "1999", ... }
      * @param {Array} group_by How to nest e.g: ["geo"]
@@ -576,7 +593,11 @@
     getValues: function(filter, group_by, previous) {
 
       if(this.isHook()) {
-        return [];
+        return _DATAMANAGER.get(this._dataId, 'data');
+      }
+
+      if(!filter) {
+        return utils.error("Can't call getValues without a filter or grouping. \nExample: marker.getValues({ time: time.value }, ['geo']);");
       }
 
       var dimTime, time, filtered, next, fraction, u, w, value;
@@ -960,41 +981,50 @@
      * @returns {Object} limits (min and max)
      */
     getLimits: function (attr) {
+      var min, max, limits = {};
+      if (!attr) {
+        attr = this._getFirstDimension({type: "time"});
+      }
       if (!this.isHook()) {
-        return;
+        this._dataCube = this._dataCube || this.getSubhooks(true);
+        utils.forEach(this._dataCube, function(hook, name) {
+          var l = hook.getLimits(attr);
+          //TODO: conservative approach, prune extra data
+          min = (typeof min === 'undefined' || l.min > min) ? l.min : min;
+          max = (typeof max === 'undefined' || l.max < max) ? l.max : max;
+        });
       }
-      //store limits so that we stop rechecking.
-      var cachedLimits = _DATAMANAGER.get(this._dataId, 'limits');
-      if (cachedLimits[attr]) {
-        return cachedLimits[attr];
-      }
-      var map = function (n) {
-        return (utils.isDate(n)) ? n : parseFloat(n);
-      };
-      var items = _DATAMANAGER.get(this._dataId);
-      var filtered = items.reduce(function (filtered, d) {
-        var f = map(d[attr]);
-        if (!isNaN(f)) {
-          filtered.push(f);
+      else {
+        //store limits so that we stop rechecking.
+        var cachedLimits = _DATAMANAGER.get(this._dataId, 'limits');
+        if (cachedLimits[attr]) {
+          return cachedLimits[attr];
         }
-        //filter
-        return filtered;
-      }, []);
-      var min;
-      var max;
-      var limits = {};
-      for (var i = 0; i < filtered.length; i += 1) {
-        var c = filtered[i];
-        if (typeof min === 'undefined' || c < min) {
-          min = c;
-        }
-        if (typeof max === 'undefined' || c > max) {
-          max = c;
+        var map = function (n) {
+          return (utils.isDate(n)) ? n : parseFloat(n);
+        };
+        var items = _DATAMANAGER.get(this._dataId);
+        var filtered = items.reduce(function (filtered, d) {
+          var f = map(d[attr]);
+          if (!isNaN(f)) {
+            filtered.push(f);
+          }
+          //filter
+          return filtered;
+        }, []);
+        for (var i = 0; i < filtered.length; i += 1) {
+          var c = filtered[i];
+          if (typeof min === 'undefined' || c < min) {
+            min = c;
+          }
+          if (typeof max === 'undefined' || c > max) {
+            max = c;
+          }
         }
       }
       limits.min = min || 0;
       limits.max = max || 100;
-      cachedLimits[attr] = limits;
+      if (this.isHook()) cachedLimits[attr] = limits;
       return limits;
     },
 
@@ -1239,7 +1269,7 @@
         evt = evt.replace('load_error', 'load_error:' + name);
         ctx.triggerAll(evt, vals);
       },
-      //loading has ended in this submodel (multiple times)
+      //all is ready in this submodel
       'ready': function (evt, vals) {
         //trigger only for submodel
         evt = evt.replace('ready', 'ready:' + name);
@@ -1313,6 +1343,121 @@
     } else {
       utils.error('ERROR: space not found.\n You must specify the objects this hook will use under the "space" attribute in the state.\n Example:\n space: ["entities", "time"]');
     }
+  }
+
+  /**
+   * Fill year data gaps in hooked data
+   * @param {Object} hook
+   * @param {Array} group_by how to slice the data array
+   * @param {Array} years date array
+   * @param {String} dimTime time dimension
+   */
+  function fillHookGaps(hook, group_by, years, dimTime) {
+    var filtered = hook.getNestedItems(group_by);
+
+    function combine(arr, add) {
+      return add.reduce( function(coll,item){
+        coll.push( item );
+        return coll;
+      }, arr );
+    }
+
+    var modified = false;
+    var newData = [];
+
+    //for each array in hook
+    utils.forEach(filtered, function(dimArr, d) {
+      //assume same array size contains correct data
+      if(dimArr.length === years.length) {
+        newData = combine(newData, dimArr);
+        return true;
+      }
+
+      modified = true;
+
+      //prune
+      var newArr = dimArr.filter(function(k) {
+        //TODO: this can be more efficient with hash
+        return years.indexOf(k[dimTime].getFullYear()) !== -1;
+      });
+
+      //assume same array size contains correct data
+      if(newArr.length === years.length) {
+        newData = combine(newData, newArr);
+        return true;
+      }
+
+      //hash per year
+      var newArrHash = {};
+      for(var i=0; i<newArr.length; i++) {
+        newArrHash[newArr[i][dimTime].getFullYear()] = newArr[i];
+      }
+      var newArrKeys = Object.keys(newArrHash).sort();
+
+      //we assume years is ordered and complete
+      var prev, next = newArrKeys[0];
+      newArr = years.map(function(y) {
+
+        while(y >= next) {
+          newArrKeys.shift();
+          if(newArrKeys.length === 0) {
+            next = false;
+            break;
+          }
+          next = newArrKeys[0];
+        }
+
+        if(y in newArrHash) {
+          prev = y;
+          return newArrHash[y];
+        }
+
+        if(!next && !prev) {
+          utils.error("Impossible to fill gaps in data");
+          return false;
+        }
+
+        var curr;
+
+        //copy next point if prev if non existing
+        if(!prev && next) {
+          prev = y;
+          curr = utils.clone(newArrHash[next]);
+          curr[dimTime] = new Date(y.toString());
+          newArrHash[y] = curr;
+          return curr;
+        }
+
+        if(!next && prev) {
+          var curr = utils.clone(newArrHash[prev]);
+          curr[dimTime] = new Date(y.toString());
+          newArrHash[y] = curr;
+          return curr;
+        }
+
+        //interpolate each new number
+        curr = utils.clone(newArrHash[prev]);
+        curr[dimTime] = new Date(y.toString());
+        var fraction = (y - prev) / (next-prev);
+        var n = newArrHash[next];
+        utils.forEach(curr, function(value, property) {
+          if(utils.isNumber(value) && utils.isNumber(n[property])) {
+            value = value + ((n[property] - value) * fraction);
+            curr[property] = value;
+          }
+        });
+
+        return curr;
+
+      });
+
+      newData = combine(newData, newArr);
+    });
+
+    if(modified) {
+      _DATAMANAGER.resetData(hook._dataId, newData);
+    }
+
   }
 
   //caches interpolation indexes globally.
