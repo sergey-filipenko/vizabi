@@ -170,14 +170,16 @@
 
     /**
      * Gets filter for time
+     * @param {Boolean} firstScreen get filter for current year only
      * @returns {Object} time filter
      */
-    getFilter: function () {
+    getFilter: function (firstScreen) {
       var start = d3.time.format(this.formatInput || "%Y")(this.start),
         end = d3.time.format(this.formatInput || "%Y")(this.end),
+        value = d3.time.format(this.formatInput || "%Y")(this.value),
         dim = this.getDimension(),
         filter = {};
-      filter[dim] = [[start, end]]
+      filter[dim] = (firstScreen) ? [value] : [[start, end]]
       return filter;
     },
 

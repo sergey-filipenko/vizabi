@@ -95,7 +95,12 @@
           done();
         });
         this.model.setHooks();
-        this.model.load();
+
+        //load first screen first, then the rest
+        this.model.load({ firstScreen: true }).then(function(){
+          _this.model.load();
+        });
+        
       } else if (this.model && this.model.isLoading()) {
         this.model.on('ready', function () {
           done();
