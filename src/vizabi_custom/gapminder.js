@@ -135,6 +135,7 @@
                 "indicator/geo.region": "Regionen",
                 "indicator/geo": "Geokod",
                 "indicator/time": "Tid",
+                "indicator/size": "Stor eller liten",
                 "indicator/geo.category": "Geo kategori",
                 "indicator/geo.name": "Geo namn",
                 "indicator/_default": "Konstant",
@@ -187,11 +188,13 @@
                 axis_y: {
                     use: "indicator",
                     which: "lex",
-                    scaleType: "linear"
+                    scaleType: "linear",
+                    allow: {scales: ["linear", "log"]}
                 },
                 axis_x: {
                     use: "property",
-                    which: "geo.name"
+                    which: "geo.name",
+                    allow: {scales: ["ordinal"]}
                 },
                 color: {
                     use: "property",
@@ -263,8 +266,8 @@
                     which: "gdp_per_cap",
                     scaleType: 'log',
                     unit: "gdp_per_cap_daily",
-                    min: 0.05, //0
-                    max: 5000 //100
+                    min: 0.11, //0
+                    max: 500 //100
                 },
                 size: {
                     use: "indicator",
@@ -284,7 +287,7 @@
                 group: {
                     which: "geo.region", // set a property of data
                     manualSorting: ["eur", "ame", "afr", "asi"],
-                    merge: true
+                    merge: false
                 }
             }
         },
@@ -292,8 +295,8 @@
         data: {
             //reader: "waffle-server"
             reader: "csv-file",
-            //path: "local_data/waffles/mountains-pop-gdp-gini-1800-2030.csv"
-            path: "https://dl.dropboxusercontent.com/u/21736853/data/process/inc_mount_data_2015test/mountains-pop-gdp-gini-1800-2030.csv"
+            path: "local_data/waffles/mountains-pop-gdp-gini-1800-2030.csv"
+            //path: "https://dl.dropboxusercontent.com/u/21736853/data/process/inc_mount_data_2015test/mountains-pop-gdp-gini-1800-2030.csv"
         }
     });
 
@@ -555,12 +558,14 @@
                     use: "indicator",
                     which: "u5mr",
                     scaleType: "log",
-                    unit: "u5mr"
+                    unit: "u5mr",
+                    allow: {scales: ["linear", "log", "genericLog"]}
                 },
                 axis_x: {
                     use: "indicator",
                     which: "gdp_per_cap",
                     scaleType: "log",
+                    allow: {scales: ["linear", "log", "genericLog"]},
                     unit: "gdp_per_cap"
                 },
                 color: {
@@ -573,7 +578,8 @@
                     use: "indicator",
                     which: "pop",
                     scaleType: "linear",
-                    min: 0,
+                    allow: {scales: ["linear", "log"]},
+                    min: 0.04,
                     max: 0.75,
                     unit: ""
                 }
@@ -583,8 +589,8 @@
             //reader: "waffle-server",
             reader: "csv-file",
             //path: "local_data/waffles/basic-indicators.csv"
-            //path: "local_data/waffles/bub_data_u5mr_inc_etc_20150823.csv"
-            path: "https://dl.dropboxusercontent.com/u/21736853/data/process/childsurv_2015test/bub_data_u5mr_inc_etc_20150823.csv"
+            path: "local_data/waffles/bub_data_u5mr_inc_etc_20150823.csv"
+            //path: "https://dl.dropboxusercontent.com/u/21736853/data/process/childsurv_2015test/bub_data_u5mr_inc_etc_20150823.csv"
         },
         language: language,
         ui: {
