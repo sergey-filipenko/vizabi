@@ -12,6 +12,9 @@ module.exports = function(grunt) {
         'assemble',
         'copy:local_data', //copies local_data
         'copy:minified', //copies minified file
+        'replace:app', //replaces which file will be used as index
+        'copy:dist', //copies dist files
+        'copy:app', //copies app files
         'clean:tmp', //clean tmp folder
     ]);
 };

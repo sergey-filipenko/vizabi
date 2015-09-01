@@ -21,160 +21,36 @@ control_buttons: {play: true, language: true, record: true }
     {{!-- Styles --}}
     <link rel="stylesheet" href="{{assets}}css/font-awesome.min.css">
     <link rel="stylesheet" href="{{assets}}css/main.css">
-    <link rel="stylesheet" href="../dist/vizabi.css">
+    <link rel="stylesheet" href="dist/vizabi.css">
   </head>
-  <body>
-    {{!-- Navigation --}}
-    {{> nav }}
+  <body class="vzbp-fullscreen">
 
     <div id="vzbp-main">
       <div id="vzbp-placeholder" class="vzbp-viewer"></div>
     </div>
 
-    <div id="vzbp-sidebar">
-      {{> sidebar }}
-
-      {{#if tool}}
-        <script>
-
-          var TITLE = "{{title}}";
-          var TOOL = "{{tool}}";
-          var DESCRIPTION = "{{description}}";
-
-          VIZABI_OPTIONS = {
-            state: {},
-            bind: {
-              "ready": function(evt, vals) {
-                updateURL();
-                updateStateEditor(VIZ.getOptions().state);
-              }
-            },
-            ui: {
-              buttons: {{{chart_buttons}}}
-            }
-          };
-
-          (function() {
-
-          VIZABI_OPTIONS.bind['change:state'] = function(evt, vals) {
-
-            //TODO: improve when to update
-            //only update in these cases
-            if(evt === "change:state:entities:select"
-              || evt === "change:state:time:playing"
-              || (evt === "change:state:time:value" && !vals.state.time.playing)
-              || evt.indexOf("change:state:marker") !== -1) {
-              updateURL();
-            }
-
-            {{#if control_state}}
-              updateStateEditor(VIZ.getOptions().state);
-            {{/if}}
-
-          };
-
-          {{#if control_buttons.play}}
-
-              var playButton = document.getElementById("vzbp-btn-play");
-              var playButtonIcon = playButton.querySelectorAll("i")[0];
-
-              VIZABI_OPTIONS.bind['change:state:time'] = function(evt, vals) {
-                if (vals.state.time.playing) {
-                    playButton.onclick = pause;
-                    playButton.setAttribute("data-tooltip", "Pause");
-                    removeClass(playButtonIcon, 'fa-play');
-                    addClass(playButtonIcon, 'fa-pause');
-                } else {
-                    playButton.onclick = play;
-                    playButton.setAttribute("data-tooltip", "Play");
-                    removeClass(playButtonIcon, 'fa-pause');
-                    addClass(playButtonIcon, 'fa-play');
-                }
-
-                {{#if control_buttons.record}}
-                  var recButton = document.getElementById("vzbp-btn-record");
-                  var recButtonIcon = recButton.querySelectorAll("i")[0];
-
-                  if (vals.state.time.record) {
-                      recButton.onclick = recstop;
-                      recButton.setAttribute("data-tooltip", "Stop");
-                      removeClass(recButtonIcon, 'fa-bullseye');
-                      addClass(recButtonIcon, 'fa-circle');
-                  } else {
-                      recButton.onclick = recstart;
-                      recButton.setAttribute("data-tooltip", "Record");
-                      removeClass(recButtonIcon, 'fa-circle');
-                      addClass(recButtonIcon, 'fa-bullseye');
-                  }
-              {{/if}}
-
-              };
-          {{/if}}
-          {{#if control_buttons.language}}
-              var langButton = document.getElementById("vzbp-btn-lang");
-
-              VIZABI_OPTIONS.bind['change:language'] = function(evt, vals) {
-                
-                if (vals.language.id === "en") {
-                    langButton.onclick = function() { language('se'); };
-                    langButton.setAttribute("data-tooltip", "Set Lang: SE");
-                    langButton.setAttribute("data-next_lang", 'se');
-                } else {
-                    langButton.onclick = function() { language('en'); };
-                    langButton.setAttribute("data-tooltip", "Set Lang: EN");
-                    langButton.setAttribute("data-next_lang", 'en');
-                }
-              };
-          {{/if}}
-          })();
-
-        </script>
-      {{/if}}
-
-      <div id="other-sect" class="collapsible-section">
-        <h2 class="vzbp-subtitle vzbp-collapsible-title">Other</h2>
-        <div class="vzbp-collapsible">
-            {{!-- Additional scripts and buttons will be added here --}}
-            {{> body }}
-        </div>
-      </div>
-
-      <hr class="vzbp-hr"/>
-
-    </div>
-
 
     <script src="{{assets}}js/d3.min.js"></script>
-    <script src="../dist/vizabi.js"></script>
-
-    {{!-- Scripts --}}
-
-    {{> state_editor }}
-
-    <script src="{{assets}}js/_utils.js"></script>
-    <script src="{{assets}}js/_collapsible.js"></script>
-    <script src="{{assets}}js/_url.js"></script>
-    <script src="{{assets}}js/_codepen.js"></script>
-    <script src="{{assets}}js/main.js"></script>
-
-    {{!-- Add these scripts only if needed --}}
-    {{#if control_state}}
-      <script src="{{assets}}js/_state-editor.js"></script>
-    {{/if}}
-
-    {{#if control_sizes}}
-      <script src="{{assets}}js/_size-div.js"></script>
-    {{/if}}
-
-    {{#if control_buttons}}
-      <script src="{{assets}}js/_interaction.js"></script>
-    {{/if}}
-
-    <script src="{{assets}}js/_dropdowns.js"></script>
+    <script src="dist/vizabi.min.js"></script>
 
     {{#if tool}}
       <script>
-        parseURL();
+
+      //div is resizable
+      var placeholder = document.getElementById('vzbp-placeholder');
+      var container = document.getElementById('vzbp-main');
+      var viz;
+
+        var TITLE = "{{title}}";
+        var TOOL = "{{tool}}";
+        var DESCRIPTION = "{{description}}";
+
+        VIZABI_OPTIONS = {
+          state: {},
+          ui: {
+            buttons: {{{chart_buttons}}}
+          }
+        };
 
         if(!VIZABI_OPTIONS) {
           VIZABI_OPTIONS = { state: {}}; //fallback
@@ -187,6 +63,63 @@ control_buttons: {play: true, language: true, record: true }
 
       </script>
     {{/if}}
+
+    <script>
+      //menu
+      var nw = require('nw.gui');
+
+      // Window menu
+      var windowMenu = new nw.Menu({
+          type: 'menubar'
+      });
+
+      var ChartMenu = new nw.Menu();
+      var GapminderMenu = new nw.Menu();
+
+      // Add to window menu
+      windowMenu.append(new nw.MenuItem({
+          type: 'normal',
+          label: 'Gapminder',
+          submenu: ChartMenu
+      }));
+      windowMenu.append(new nw.MenuItem({
+          type: 'normal',
+          label: 'About',
+          submenu: GapminderMenu
+      }));
+
+      ChartMenu.append(new nw.MenuItem({
+          label: 'Bubble Chart',
+          click: function(){
+              nw.Window.get(window.open('bubblechart.html'));
+          }
+      }));
+
+      ChartMenu.append(new nw.MenuItem({
+          label: 'Mountain Chart',
+          click: function(){
+              nw.Window.get(window.open('mountainchart.html'));
+          }
+      }));
+
+      GapminderMenu.append(new nw.MenuItem({
+          label: 'Software',
+          click: function(){
+              alert('This is an offline alpha version of Gapminder Vizabi. Version number 0.7.0. Please report errors on http://github.com/Gapminder/vizabi/issues');
+          }
+      }));
+
+      GapminderMenu.append(new nw.MenuItem({
+          label: 'Website',
+          click: function(){
+              nw.Window.get(window.open('http://www.gapminder.org', 'Gapminder Website', 'width=1280,height=768,scrollbars=yes'))
+          }
+      }));
+
+      // Assign to window
+      nw.Window.get().menu = windowMenu;
+
+    </script>
 
   </body>
 </html>

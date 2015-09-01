@@ -9,6 +9,12 @@
   var root = this;
   var Vizabi = root.Vizabi;
 
+  //TODO: move polyfill
+  //necessary for compatibility
+  Math.log10 = Math.log10 || function(x) {
+    return Math.log(x) / Math.LN10;
+  };
+
   Vizabi.utils = {
 
     /*
