@@ -259,8 +259,8 @@
         state: {
             time: {
                 start: "1800",
-                end: "2030",
-                value: "2015",
+                end: "2013",
+                value: "2013",
                 step: 1,
                 speed: 300,
                 formatInput: "%Y",
@@ -287,12 +287,16 @@
                     which: "geo.name"
                 },
                 axis_y: {
+                    min: 1,
+                    max: 900,
                     use: "indicator",
                     which: "u5mr",
                     scaleType: "log",
                     allow: {scales: ["linear", "log", "genericLog"]}
                 },
                 axis_x: {
+                    min: 300,
+                    max: 200000,
                     use: "indicator",
                     which: "gdp_per_cap",
                     scaleType: "log",
@@ -314,10 +318,10 @@
             }
         },
         data: {
-            //reader: "waffle-server",
-            reader: "csv-file",
+            reader: "waffle-server",
+            //reader: "csv-file",
             //path: Vizabi._globals.gapminder_paths.baseUrl + "local_data/waffles/basic-indicators.csv",
-            path: Vizabi._globals.gapminder_paths.baseUrl + "local_data/waffles/bub_data_u5mr_inc_etc_20150823.csv",
+            //path: Vizabi._globals.gapminder_paths.baseUrl + "local_data/waffles/bub_data_u5mr_inc_etc_20150823.csv",
             splash: true
             //path: "https://dl.dropboxusercontent.com/u/21736853/data/process/childsurv_2015test/bub_data_u5mr_inc_etc_20150823.csv"
         },
@@ -423,7 +427,25 @@
         //TODO: concurrent
         //load language first
         this.preloadLanguage().then(function() {
-            //then metadata
+
+          var query = {
+              'query': [
+                {
+                  'SELECT': [
+                    '*'
+                  ],
+                  'WHERE': {
+                    'quantity': [
+                      '*'
+                    ]
+                  },
+                  'FROM': 'humnum'
+                }
+              ],
+              'lang': 'en'
+            };
+
+
             d3.json(metadata_path, function(metadata) {
                 
                 globals.metadata = metadata;
@@ -434,8 +456,28 @@
                         var one = metadata.indicatorsDB[f];
                         return one.allowCharts.indexOf(_this.name)!=-1 || one.allowCharts.indexOf("*")!=-1;
                     });
-                
-                promise.resolve();
+
+                //TODO: SUPER HACK TO INTEGRATE WITH WAFFLE SERVER
+                d3.json("http://52.18.235.31:8001/values/quantity")
+                  .header("Content-Type", "application/json")
+                  .post(JSON.stringify(query),function(err, response) {
+
+                    globals.metadata.indicatorsArray = response.map(function(ind) {
+                      return ind['-t-ind'];
+                    });
+
+                    //copy to indicators DB
+
+                    for(var i in globals.metadata.indicatorsArray) {
+                      var ind = globals.metadata.indicatorsArray[i];
+                      if(!metadata.indicatorsDB[ind]) {
+                        metadata.indicatorsDB[ind] = metadata.indicatorsDB['pop'];
+                      }
+                    }
+
+                    promise.resolve();
+                  });
+            
             });
         });
 
