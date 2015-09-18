@@ -258,9 +258,9 @@
 
         state: {
             time: {
-                start: "1800",
+                start: "1981",
                 end: "2013",
-                value: "2013",
+                value: "1990",
                 step: 1,
                 speed: 300,
                 formatInput: "%Y",
@@ -287,12 +287,18 @@
                     which: "geo.name"
                 },
                 axis_y: {
-                    min: 1,
-                    max: 900,
-                    use: "indicator",
-                    which: "u5mr",
-                    scaleType: "log",
-                    allow: {scales: ["linear", "log", "genericLog"]}
+                  use: "indicator",
+                  which: "one-year-olds_immunized_with_three_doses_of_diphtheria_tetanus_toxoid_and_pertussis_(dtp3)_(%)",
+                  min: -4.95,
+                  max: 103.95,
+                  scaleType: "linear",
+                  allow: {
+                    scales: [
+                      "linear",
+                      "log",
+                      "genericLog"
+                    ]
+                  }
                 },
                 axis_x: {
                     min: 300,
