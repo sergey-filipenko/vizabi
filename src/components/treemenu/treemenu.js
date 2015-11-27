@@ -27,6 +27,7 @@ var css = {
   list_item: 'vzb-treemenu-list-item',
   hasChild: 'vzb-treemenu-list-item-children',
   list_item_label: 'vzb-treemenu-list-item-label',
+  menu_wrapper: 'vzb-treemenu-list-wrap',
   list_top_level: 'vzb-treemenu-list-top',
   search_wrap: 'vzb-treemenu-search-wrap',
   isSpecial: 'vzb-treemenu-list-item-special',
@@ -518,7 +519,8 @@ var TreeMenu = Component.extend({
       .classed(css.search, true)
       .attr('type', 'text')
       .attr('id', css.search);
-
+    this.wrapper.append('div')
+      .classed(css.menu_wrapper, true);
 
     //init functions
     d3.select('body').on('mousemove', _this._mousemoveDocument);
@@ -752,7 +754,7 @@ var TreeMenu = Component.extend({
     if (OPTIONS.IS_MOBILE) {
       OPTIONS.MENU_DIRECTION = MENU_VERTICAL;
     }
-    createSubmeny(this.wrapper, dataFiltered, true);
+    createSubmeny(this.wrapper.select('.' + css.menu_wrapper), dataFiltered, true);
     this.menuEntity = new Menu(null, this.wrapper.select('.' + css.list_top_level))
       .setWidth(this.activeProfile.col_width, true)
       .setDirection(OPTIONS.MENU_DIRECTION);
