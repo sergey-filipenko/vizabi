@@ -568,10 +568,23 @@ var TreeMenu = Component.extend({
         if (this.menuEntity.direction != MENU_VERTICAL) {
           this.menuEntity.setDirection(MENU_VERTICAL, true);
         }
+
+        var wrapperHeight = this.wrapper.node().offsetHeight;
+        var placeholderHeight = this.placeholder.offsetHeight;
+        var titleHeight = this.wrapper.select('.' + css.title).node().offsetHeight;
+        var searchHeight = this.wrapper.select('.' + css.search_wrap).node().offsetHeight;
+        var menuMaxHeight = placeholderHeight - placeholderHeight/10 - titleHeight - searchHeight - 60;
+        console.log(wrapperHeight);
+        this.wrapper.select('.' + css.menu_wrapper)
+          .style('max-height', menuMaxHeight + "px")
+          .style('overflow-y', "auto");
       } else {
         if (this.menuEntity.direction != MENU_HORIZONTAL) {
           this.menuEntity.setDirection(MENU_HORIZONTAL, true);
         }
+        this.wrapper.select('.' + css.menu_wrapper)
+          .style('max-height', '');
+
       }
     }
     return this;
