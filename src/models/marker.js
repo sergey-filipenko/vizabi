@@ -29,10 +29,10 @@ var Marker = Model.extend({
     }
 
   },
-    
-    
-    
-    
+
+
+
+
   /**
    * gets the items associated with this hook without values
    * @param filter filter
@@ -49,142 +49,148 @@ var Marker = Model.extend({
       }
       return found;
   },
-    
-    getFrame: function(time) {
-        var _this = this;
-        var steps = this._parent.time.getAllSteps();
 
-        var cachePath = "";
-        utils.forEach(this._dataCube, function(hook, name) {
-            cachePath = cachePath + "," + name + ":" + hook.which + " " + _this._parent.time.start + " " + _this._parent.time.end;
-        });
-        if(!this.cachedFrames || !this.cachedFrames[cachePath]) this.getFrames();
+  getResultKeys: function() {
+    var _this = this;
+    var resultKeys = [];
+    utils.forEach(this._dataCube, function(hook, name) {
 
-        if(this.cachedFrames[cachePath][time]) return this.cachedFrames[cachePath][time];
+      // If hook use is constant, then we can provide no additional info about keys
+      // We can just hope that we have something else than constants =)
+      if(hook.use === "constant") return;
 
-        if(time < steps[0] || time > steps[steps.length - 1]) {
-            //if the requested time point is out of the known range
-            //then send nulls in the response
-            var pValues = this.cachedFrames[cachePath][steps[0]];
-            var curr = {};
-            utils.forEach(pValues, function(keys, hook) {
-                curr[hook] = {};
-                utils.forEach(keys, function(val, key) {
-                    curr[hook][key] = null;
+      // Get keys in data of this hook
+      var nested = _this.getDataManager().get(hook._dataId, 'nested', ["geo", "time"]);
+      var keys = Object.keys(nested);
+
+      if(resultKeys.length == 0) {
+        // If ain't got nothing yet, set the list of keys to result
+        resultKeys = keys;
+      } else {
+        // If there is result accumulated aleready, remove the keys from it that are not in this hook
+        resultKeys = resultKeys.filter(function(f) {
+          return keys.indexOf(f) > -1;
+        })
+      }
+    });
+    return resultKeys;
+  },
+
+  getFrame: function(time) {
+      var _this = this;
+      var steps = this._parent.time.getAllSteps();
+
+      var cachePath = "";
+      utils.forEach(this._dataCube, function(hook, name) {
+          cachePath = cachePath + "," + name + ":" + hook.which + " " + _this._parent.time.start + " " + _this._parent.time.end;
+      });
+      if(!this.cachedFrames || !this.cachedFrames[cachePath]) this.getFrames();
+
+      if(this.cachedFrames[cachePath][time]) return this.cachedFrames[cachePath][time];
+
+      if(time < steps[0] || time > steps[steps.length - 1]) {
+          //if the requested time point is out of the known range
+          //then send nulls in the response
+          var pValues = this.cachedFrames[cachePath][steps[0]];
+          var curr = {};
+          utils.forEach(pValues, function(keys, hook) {
+              curr[hook] = {};
+              utils.forEach(keys, function(val, key) {
+                  curr[hook][key] = null;
+              });
+          });
+          return curr;
+      }
+
+
+      var next = d3.bisectLeft(steps, time);
+
+      if(next === 0) return this.cachedFrames[cachePath][steps[0]];
+
+      var fraction = (time - steps[next - 1]) / (steps[next] - steps[next - 1]);
+
+      var pValues = this.cachedFrames[cachePath][steps[next - 1]];
+      var nValues = this.cachedFrames[cachePath][steps[next]];
+
+      var curr = {};
+      utils.forEach(pValues, function(values, hook) {
+          curr[hook] = {};
+          utils.forEach(values, function(val, id) {
+              if( !utils.isNumber(val) ){
+                  curr[hook][id] = val;
+              }else{
+                  var val2 = nValues[hook][id];
+                  curr[hook][id] = (val==null||val2==null)? null : val + ((val2 - val) * fraction);
+              }
+          });
+      });
+
+      return curr;
+  },
+
+  getFrames: function() {
+    var _this = this;
+
+    var cachePath = "";
+    utils.forEach(this._dataCube, function(hook, name) {
+        cachePath = cachePath + "," + name + ":" + hook.which + " " + _this._parent.time.start + " " + _this._parent.time.end;
+    });
+
+    if(!this.cachedFrames) this.cachedFrames = {};
+    if(this.cachedFrames[cachePath]) return this.cachedFrames[cachePath];
+
+    var steps = this._parent.time.getAllSteps();
+
+    this._dataCube = this._dataCube || this.getSubhooks(true)
+
+    var result = {};
+
+    // Assemble the list of keys as an intersection of keys in all queries of all hooks
+    var resultKeys = this.getResultKeys();
+
+    steps.forEach(function(t) {
+        result[t] = {};
+    });
+
+    utils.forEach(this._dataCube, function(hook, name) {
+
+        if(hook.use === "constant") {
+            steps.forEach(function(t) {
+                result[t][name] = {};
+                resultKeys.forEach(function(key) {
+                    result[t][name][key] = hook.which;
                 });
             });
-            return curr;
+
+        } else if(hook.which === "geo") {
+            steps.forEach(function(t) {
+                result[t][name] = {};
+                resultKeys.forEach(function(key) {
+                    result[t][name][key] = key;
+                });
+            });
+
+        } else if(hook.which === "time") {
+            steps.forEach(function(t) {
+                result[t][name] = {};
+                resultKeys.forEach(function(key) {
+                    result[t][name][key] = new Date(t);
+                });
+            });
+
+        } else {
+            var frames = _this.getDataManager().get(hook._dataId, 'frames', steps);
+            utils.forEach(frames, function(frame, t) {
+                result[t][name] = frame[hook.which];
+            });
         }
+    });
+
+    this.cachedFrames[cachePath] = result;
+    return result;
+  },
 
 
-        var next = d3.bisectLeft(steps, time);
-
-        if(next === 0) return this.cachedFrames[cachePath][steps[0]];
-
-        var fraction = (time - steps[next - 1]) / (steps[next] - steps[next - 1]);
-
-        var pValues = this.cachedFrames[cachePath][steps[next - 1]];
-        var nValues = this.cachedFrames[cachePath][steps[next]];
-
-        var curr = {};
-        utils.forEach(pValues, function(values, hook) {
-            curr[hook] = {};
-            utils.forEach(values, function(val, id) {
-                if( !utils.isNumber(val) ){
-                    curr[hook][id] = val;
-                }else{
-                    var val2 = nValues[hook][id];
-                    curr[hook][id] = (val==null||val2==null)? null : val + ((val2 - val) * fraction);
-                }
-            });
-        });
-
-        return curr;
-    },
-
-    getFrames: function() {
-        var _this = this;
-
-        var cachePath = "";
-        utils.forEach(this._dataCube, function(hook, name) {
-            cachePath = cachePath + "," + name + ":" + hook.which + " " + _this._parent.time.start + " " + _this._parent.time.end;
-        });
-
-        if(!this.cachedFrames) this.cachedFrames = {};
-        if(this.cachedFrames[cachePath]) return this.cachedFrames[cachePath];
-
-        var steps = this._parent.time.getAllSteps();
-
-        this._dataCube = this._dataCube || this.getSubhooks(true)
-
-        var result = {};
-        var resultKeys = [];
-
-        // Assemble the list of keys as an intersection of keys in all queries of all hooks
-        utils.forEach(this._dataCube, function(hook, name) {
-
-            // If hook use is constant, then we can provide no additional info about keys
-            // We can just hope that we have something else than constants =) 
-            if(hook.use === "constant") return;
-
-            // Get keys in data of this hook
-            var nested = _this.getDataManager().get(hook._dataId, 'nested', ["geo", "time"]);
-            var keys = Object.keys(nested);
-
-            if(resultKeys.length == 0) {
-                // If ain't got nothing yet, set the list of keys to result
-                resultKeys = keys;
-            } else {
-                // If there is result accumulated aleready, remove the keys from it that are not in this hook
-                resultKeys = resultKeys.filter(function(f) {
-                    return keys.indexOf(f) > -1;
-                })
-            }
-        });
-
-        steps.forEach(function(t) {
-            result[t] = {};
-        });
-
-        utils.forEach(this._dataCube, function(hook, name) {
-
-            if(hook.use === "constant") {
-                steps.forEach(function(t) {
-                    result[t][name] = {};
-                    resultKeys.forEach(function(key) {
-                        result[t][name][key] = hook.which;
-                    });
-                });
-
-            } else if(hook.which === "geo") {
-                steps.forEach(function(t) {
-                    result[t][name] = {};
-                    resultKeys.forEach(function(key) {
-                        result[t][name][key] = key;
-                    });
-                });
-
-            } else if(hook.which === "time") {
-                steps.forEach(function(t) {
-                    result[t][name] = {};
-                    resultKeys.forEach(function(key) {
-                        result[t][name][key] = new Date(t);
-                    });
-                });
-
-            } else {
-                var frames = _this.getDataManager().get(hook._dataId, 'frames', steps);
-                utils.forEach(frames, function(frame, t) {
-                    result[t][name] = frame[hook.which];
-                });
-            }
-        });
-
-        this.cachedFrames[cachePath] = result;
-        return result;
-    },
-    
-    
 
   /**
    * gets multiple values from the hook
@@ -221,7 +227,7 @@ var Marker = Model.extend({
         u = hook.use;
         w = hook.which;
 
-        if(hook.use !== "property") next = next || d3.bisectLeft(hook.getUnique(dimTime), time);        
+        if(hook.use !== "property") next = next || d3.bisectLeft(hook.getUnique(dimTime), time);
 
         method = hook.getMetadata().interpolation;
         filtered = _this.getDataManager().get(hook._dataId, 'nested', f_keys);
@@ -245,23 +251,23 @@ var Marker = Model.extend({
     //else, interpolate all with time
     else {
       utils.forEach(this._dataCube, function(hook, name) {
-          
+
         filtered = _this.getDataManager().get(hook._dataId, 'nested', group_by);
-            
+
         response[name] = {};
         //find position from first hook
         u = hook.use;
         w = hook.which;
-          
+
         if(hook.use !== "property") next = (typeof next === 'undefined') ? d3.bisectLeft(hook.getUnique(dimTime), time) : next;
-        
+
         method = hook.getMetadata().interpolation;
 
 
         utils.forEach(filtered, function(arr, id) {
-          //TODO: this saves when geos have different data length. line can be optimised. 
+          //TODO: this saves when geos have different data length. line can be optimised.
           next = d3.bisectLeft(arr.map(function(m){return m.time}), time);
-            
+
           value = utils.interpolatePoint(arr, u, w, next, dimTime, time, method);
           response[name][id] = hook.mapValue(value);
 
@@ -289,15 +295,15 @@ var Marker = Model.extend({
   getMetadata: function() {
     return this.getDataManager().getMetadata();
   },
-    
+
   /**
    * Gets the metadata of all hooks
    * @returns {Object} metadata
    */
   getIndicatorsTree: function() {
     return this.getDataManager().getIndicatorsTree();
-  } 
-    
+  }
+
 
 });
 
